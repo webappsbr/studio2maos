@@ -417,6 +417,7 @@ input[type="password"] { letter-spacing:0.12em; }
     <div id="lc-appt-banner" style="display:none;background:linear-gradient(135deg,#F6BCAE 0%,#DFA08E 100%);border-radius:14px;padding:16px;margin-bottom:14px;color:#5A2D1A;text-align:center">
       <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;opacity:0.75;margin-bottom:4px">Seu próximo horário</div>
       <div id="lc-appt-text" style="font-size:1.05rem;font-weight:600"></div>
+      <a id="lc-appt-gcal" href="#" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;font-size:0.78rem;font-weight:500;color:#5A2D1A;text-decoration:underline">📅 Adicionar ao Google Agenda</a>
     </div>
 
     <div class="card">
@@ -505,6 +506,7 @@ input[type="password"] { letter-spacing:0.12em; }
         <input type="text" id="appt-service" placeholder="Ex.: Manutenção, Blindagem, Esmaltação em gel" style="width:100%;padding:9px;border:1px solid var(--nude-mid);border-radius:8px;margin-bottom:10px;font-size:0.9rem">
         <div id="admin-appt-alert" class="alert"></div>
         <button class="btn btn-gold" onclick="saveAppt()">Salvar horário</button>
+        <a class="btn btn-nude" id="btn-google-cal" href="#" target="_blank" rel="noopener" style="display:none;margin-top:8px;text-align:center;text-decoration:none">📅 Adicionar ao Google Agenda</a>
         <button class="btn btn-nude" id="btn-clear-appt" onclick="clearAppt()" style="display:none;margin-top:8px">Limpar horário</button>
       </div>
 
@@ -763,6 +765,7 @@ function renderAdminDetail(c) {
   const apDt=document.getElementById('appt-datetime');
   const apSvc=document.getElementById('appt-service');
   const btnClear=document.getElementById('btn-clear-appt');
+  const btnGCal=document.getElementById('btn-google-cal');
   if(c.nextAppt&&c.nextAppt.datetime){
     apCur.innerHTML=`<strong>Agendado:</strong> ${fmtDateTime(c.nextAppt.datetime)}<br><span style="color:var(--muted)">${c.nextAppt.service||''}</span>`;
     const d=new Date(c.nextAppt.datetime);
@@ -770,9 +773,12 @@ function renderAdminDetail(c) {
     apDt.value=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     apSvc.value=c.nextAppt.service||'';
     btnClear.style.display='block';
+    btnGCal.href=buildGCalUrl(c.nextAppt.datetime,c.nextAppt.service,c.name);
+    btnGCal.style.display='block';
   } else {
     apCur.innerHTML='<span style="color:var(--muted)">Nenhum horário agendado.</span>';
     apDt.value=''; apSvc.value=''; btnClear.style.display='none';
+    btnGCal.style.display='none';
   }
   const hist=document.getElementById('admin-history');
   if(!c.services.length){hist.innerHTML='<div style="font-size:0.8rem;color:var(--muted)">Nenhum serviço ainda.</div>';return;}
@@ -802,6 +808,18 @@ function clearAppt() {
   save();
   renderAdminDetail(c);
   if(shownClientId===c.id) showLoyaltyCard(c);
+}
+function pad2(n){ return String(n).padStart(2,'0'); }
+function toGCalString(d){
+  return `${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}T${pad2(d.getHours())}${pad2(d.getMinutes())}00`;
+}
+function buildGCalUrl(datetimeISO, service, clientName){
+  const start=new Date(datetimeISO);
+  const end=new Date(start.getTime()+60*60*1000); // duração padrão de 1h
+  const text=encodeURIComponent(`${service||'Atendimento'}${clientName?` — ${clientName}`:''}`);
+  const details=encodeURIComponent(`Studio 2 Mãos${clientName?` — Cliente: ${clientName}`:''}`);
+  const dates=`${toGCalString(start)}/${toGCalString(end)}`;
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dates}&details=${details}`;
 }
 function renderNailGrid(cid,count,goal) {
   const el=document.getElementById(cid); el.innerHTML='';
@@ -842,6 +860,7 @@ function showLoyaltyCard(c) {
   if(c.nextAppt&&c.nextAppt.datetime&&new Date(c.nextAppt.datetime)>=new Date(now.getFullYear(),now.getMonth(),now.getDate())){
     document.getElementById('lc-appt-text').textContent=
       c.nextAppt.service?`${fmtDateTime(c.nextAppt.datetime)} — ${c.nextAppt.service}`:fmtDateTime(c.nextAppt.datetime);
+    document.getElementById('lc-appt-gcal').href=buildGCalUrl(c.nextAppt.datetime,c.nextAppt.service,c.name);
     apBanner.style.display='block';
   } else {
     apBanner.style.display='none';
