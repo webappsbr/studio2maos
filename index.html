@@ -460,6 +460,11 @@ input[type="password"] { letter-spacing:0.12em; }
       <div class="stat-box"><div class="stat-num" id="stat-gifts">0</div><div class="stat-lbl">Prêmios</div></div>
     </div>
 
+    <div class="card" id="tomorrow-appts-card">
+      <div class="card-title">📅 Horários de amanhã</div>
+      <div id="tomorrow-appts-list"></div>
+    </div>
+
     <div id="clients-list-view">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
@@ -709,6 +714,61 @@ function updateStats() {
   document.getElementById('stat-total').textContent=state.clients.length;
   document.getElementById('stat-services').textContent=state.clients.reduce((a,c)=>a+c.services.length,0);
   document.getElementById('stat-gifts').textContent=state.clients.reduce((a,c)=>a+(c.gifts||0),0);
+  renderTomorrowAppts();
+}
+function getTomorrowRange() {
+  const now=new Date();
+  const start=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1,0,0,0,0);
+  const end=new Date(now.getFullYear(),now.getMonth(),now.getDate()+2,0,0,0,0);
+  return {start,end};
+}
+function renderTomorrowAppts() {
+  const el=document.getElementById('tomorrow-appts-list');
+  if(!el) return;
+  const {start,end}=getTomorrowRange();
+  const list=state.clients
+    .filter(c=>c.nextAppt&&c.nextAppt.datetime)
+    .map(c=>({c,d:new Date(c.nextAppt.datetime)}))
+    .filter(x=>x.d>=start&&x.d<end)
+    .sort((a,b)=>a.d-b.d);
+  if(!list.length){
+    el.innerHTML='<div style="font-size:0.8rem;color:var(--muted)">Nenhum horário agendado para amanhã.</div>';
+    return;
+  }
+  const pad=n=>String(n).padStart(2,'0');
+  el.innerHTML=list.map(({c,d})=>{
+    const time=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const svc=c.nextAppt.service||'';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #F0E2DA">
+      <div>
+        <div style="font-weight:500;font-size:0.88rem">${time} — ${c.name}</div>
+        <div style="font-size:0.75rem;color:var(--muted)">${svc}</div>
+      </div>
+      <button class="btn btn-nude" style="width:auto;padding:8px 12px;margin:0;font-size:0.75rem;white-space:nowrap" onclick="sendConfirmWhatsApp('${c.id}')">📲 Confirmar</button>
+    </div>`;
+  }).join('');
+}
+function digitsOnly(s) { return (s||'').replace(/\D/g,''); }
+function buildWhatsAppNumber(phone) {
+  let d=digitsOnly(phone);
+  if(!d) return '';
+  if(d.length>11&&d.startsWith('0')) d=d.slice(1);
+  if(d.length===10||d.length===11) d='55'+d; // DDD + número, sem código do país ainda
+  return d;
+}
+function sendConfirmWhatsApp(clientId) {
+  const c=state.clients.find(x=>x.id===clientId);
+  if(!c||!c.nextAppt) return;
+  const num=buildWhatsAppNumber(c.phone);
+  if(!num){ alert('Esta cliente não tem telefone cadastrado.'); return; }
+  const d=new Date(c.nextAppt.datetime);
+  const pad=n=>String(n).padStart(2,'0');
+  const dataStr=`${pad(d.getDate())}/${pad(d.getMonth()+1)}`;
+  const horaStr=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const svc=c.nextAppt.service?` de ${c.nextAppt.service}`:'';
+  const msg=`Olá, ${c.name}! Aqui é do Studio 2 Mãos 💅 Passando para confirmar seu horário${svc} amanhã, dia ${dataStr} às ${horaStr}. Podemos confirmar?`;
+  const url=`https://wa.me/${num}?text=${encodeURIComponent(msg)}`;
+  window.open(url,'_blank','noopener');
 }
 function renderClientList() {
   const q=(document.getElementById('search-clients')?.value||'').toLowerCase();
@@ -732,12 +792,14 @@ function openClientDetail(id) {
   selectedClientId=id;
   const c=state.clients.find(x=>x.id===id); if(!c) return;
   document.getElementById('clients-list-view').style.display='none';
+  document.getElementById('tomorrow-appts-card').style.display='none';
   document.getElementById('client-detail-view').classList.add('active');
   renderAdminDetail(c);
 }
 function backToList() {
   selectedClientId=null;
   document.getElementById('clients-list-view').style.display='block';
+  document.getElementById('tomorrow-appts-card').style.display='block';
   document.getElementById('client-detail-view').classList.remove('active');
   document.getElementById('admin-detail-alert').className='alert';
   renderClientList();
