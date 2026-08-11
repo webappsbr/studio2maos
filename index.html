@@ -505,8 +505,7 @@ input[type="password"] { letter-spacing:0.12em; }
         <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px">Tipo de serviço</label>
         <input type="text" id="appt-service" placeholder="Ex.: Manutenção, Blindagem, Esmaltação em gel" style="width:100%;padding:9px;border:1px solid var(--nude-mid);border-radius:8px;margin-bottom:10px;font-size:0.9rem">
         <div id="admin-appt-alert" class="alert"></div>
-        <button class="btn btn-gold" onclick="saveAppt()">Salvar horário</button>
-        <a class="btn btn-nude" id="btn-google-cal" href="#" target="_blank" rel="noopener" style="display:none;margin-top:8px;text-align:center;text-decoration:none">📅 Adicionar ao Google Agenda</a>
+        <button class="btn btn-gold" onclick="saveApptAndGCal()">📅 Salvar e adicionar ao Google Agenda</button>
         <button class="btn btn-nude" id="btn-clear-appt" onclick="clearAppt()" style="display:none;margin-top:8px">Limpar horário</button>
       </div>
 
@@ -765,7 +764,6 @@ function renderAdminDetail(c) {
   const apDt=document.getElementById('appt-datetime');
   const apSvc=document.getElementById('appt-service');
   const btnClear=document.getElementById('btn-clear-appt');
-  const btnGCal=document.getElementById('btn-google-cal');
   if(c.nextAppt&&c.nextAppt.datetime){
     apCur.innerHTML=`<strong>Agendado:</strong> ${fmtDateTime(c.nextAppt.datetime)}<br><span style="color:var(--muted)">${c.nextAppt.service||''}</span>`;
     const d=new Date(c.nextAppt.datetime);
@@ -773,12 +771,9 @@ function renderAdminDetail(c) {
     apDt.value=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     apSvc.value=c.nextAppt.service||'';
     btnClear.style.display='block';
-    btnGCal.href=buildGCalUrl(c.nextAppt.datetime,c.nextAppt.service,c.name);
-    btnGCal.style.display='block';
   } else {
     apCur.innerHTML='<span style="color:var(--muted)">Nenhum horário agendado.</span>';
     apDt.value=''; apSvc.value=''; btnClear.style.display='none';
-    btnGCal.style.display='none';
   }
   const hist=document.getElementById('admin-history');
   if(!c.services.length){hist.innerHTML='<div style="font-size:0.8rem;color:var(--muted)">Nenhum serviço ainda.</div>';return;}
@@ -800,6 +795,14 @@ function saveAppt() {
   al.textContent='Horário salvo!';al.className='alert success';
   renderAdminDetail(c);
   if(shownClientId===c.id) showLoyaltyCard(c);
+  return true;
+}
+function saveApptAndGCal() {
+  const ok=saveAppt();
+  if(!ok) return;
+  const c=state.clients.find(x=>x.id===selectedClientId);
+  if(!c||!c.nextAppt) return;
+  window.open(buildGCalUrl(c.nextAppt.datetime,c.nextAppt.service,c.name),'_blank','noopener');
 }
 function clearAppt() {
   const c=state.clients.find(x=>x.id===selectedClientId);
@@ -810,16 +813,16 @@ function clearAppt() {
   if(shownClientId===c.id) showLoyaltyCard(c);
 }
 function pad2(n){ return String(n).padStart(2,'0'); }
-function toGCalString(d){
-  return `${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}T${pad2(d.getHours())}${pad2(d.getMinutes())}00`;
+function toGCalUTC(d){
+  return `${d.getUTCFullYear()}${pad2(d.getUTCMonth()+1)}${pad2(d.getUTCDate())}T${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}00Z`;
 }
 function buildGCalUrl(datetimeISO, service, clientName){
   const start=new Date(datetimeISO);
   const end=new Date(start.getTime()+60*60*1000); // duração padrão de 1h
-  const text=encodeURIComponent(`${service||'Atendimento'}${clientName?` — ${clientName}`:''}`);
-  const details=encodeURIComponent(`Studio 2 Mãos${clientName?` — Cliente: ${clientName}`:''}`);
-  const dates=`${toGCalString(start)}/${toGCalString(end)}`;
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dates}&details=${details}`;
+  const title=encodeURIComponent((service||'Atendimento')+(clientName?(' - '+clientName):''));
+  const detailsText=encodeURIComponent('Studio 2 Maos'+(clientName?(' - Cliente: '+clientName):''));
+  const dates=`${toGCalUTC(start)}/${toGCalUTC(end)}`;
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${detailsText}`;
 }
 function renderNailGrid(cid,count,goal) {
   const el=document.getElementById(cid); el.innerHTML='';
