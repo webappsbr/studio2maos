@@ -414,6 +414,11 @@ input[type="password"] { letter-spacing:0.12em; }
       <div class="gb-sub">Mostre este cartão para a sua nail designer 💅</div>
     </div>
 
+    <div id="lc-appt-banner" style="display:none;background:linear-gradient(135deg,#F6BCAE 0%,#DFA08E 100%);border-radius:14px;padding:16px;margin-bottom:14px;color:#5A2D1A;text-align:center">
+      <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;opacity:0.75;margin-bottom:4px">Seu próximo horário</div>
+      <div id="lc-appt-text" style="font-size:1.05rem;font-weight:600"></div>
+    </div>
+
     <div class="card">
       <div class="card-title">Histórico de serviços</div>
       <div id="lc-history"></div>
@@ -489,6 +494,18 @@ input[type="password"] { letter-spacing:0.12em; }
         <button class="btn btn-gold" onclick="addService()">+ Registrar serviço</button>
         <button class="btn btn-nude" id="btn-remove-service" onclick="removeService()" style="display:none">− Remover último serviço</button>
         <button class="btn btn-primary" id="btn-redeem" onclick="redeemGift()" style="display:none;margin-top:8px">🎁 Resgatar prêmio</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Próximo horário</div>
+        <div id="admin-appt-current" style="font-size:0.85rem;margin-bottom:12px"></div>
+        <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px">Data e hora</label>
+        <input type="datetime-local" id="appt-datetime" style="width:100%;padding:9px;border:1px solid var(--nude-mid);border-radius:8px;margin-bottom:10px;font-size:0.9rem">
+        <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px">Tipo de serviço</label>
+        <input type="text" id="appt-service" placeholder="Ex.: Manutenção, Blindagem, Esmaltação em gel" style="width:100%;padding:9px;border:1px solid var(--nude-mid);border-radius:8px;margin-bottom:10px;font-size:0.9rem">
+        <div id="admin-appt-alert" class="alert"></div>
+        <button class="btn btn-gold" onclick="saveAppt()">Salvar horário</button>
+        <button class="btn btn-nude" id="btn-clear-appt" onclick="clearAppt()" style="display:none;margin-top:8px">Limpar horário</button>
       </div>
 
       <div class="card">
@@ -576,6 +593,12 @@ function save() {
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'2-digit'});
+}
+function fmtDateTime(iso) {
+  const d=new Date(iso);
+  const data=d.toLocaleDateString('pt-BR',{day:'2-digit',month:'long'});
+  const hora=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  return `${data} às ${hora}`;
 }
 
 // ── NAV ──
@@ -735,12 +758,50 @@ function renderAdminDetail(c) {
     c.gifts>1?`${c.gifts} prêmios disponíveis!`:'Prêmio disponível!';
   document.getElementById('btn-redeem').style.display=hasGift?'block':'none';
   document.getElementById('btn-remove-service').style.display=c.services.length?'block':'none';
+  // Próximo horário
+  const apCur=document.getElementById('admin-appt-current');
+  const apDt=document.getElementById('appt-datetime');
+  const apSvc=document.getElementById('appt-service');
+  const btnClear=document.getElementById('btn-clear-appt');
+  if(c.nextAppt&&c.nextAppt.datetime){
+    apCur.innerHTML=`<strong>Agendado:</strong> ${fmtDateTime(c.nextAppt.datetime)}<br><span style="color:var(--muted)">${c.nextAppt.service||''}</span>`;
+    const d=new Date(c.nextAppt.datetime);
+    const pad=n=>String(n).padStart(2,'0');
+    apDt.value=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    apSvc.value=c.nextAppt.service||'';
+    btnClear.style.display='block';
+  } else {
+    apCur.innerHTML='<span style="color:var(--muted)">Nenhum horário agendado.</span>';
+    apDt.value=''; apSvc.value=''; btnClear.style.display='none';
+  }
   const hist=document.getElementById('admin-history');
   if(!c.services.length){hist.innerHTML='<div style="font-size:0.8rem;color:var(--muted)">Nenhum serviço ainda.</div>';return;}
   hist.innerHTML=[...c.services].reverse().map((s,i)=>{
     const n=c.services.length-i;
     return `<div class="hist-item"><span>#${n} — ${fmtDate(s.date)}</span><span>✓</span></div>`;
   }).join('');
+}
+function saveAppt() {
+  const c=state.clients.find(x=>x.id===selectedClientId);
+  if(!c) return;
+  const dt=document.getElementById('appt-datetime').value;
+  const svc=document.getElementById('appt-service').value.trim();
+  const al=document.getElementById('admin-appt-alert');
+  if(!dt){al.textContent='Informe a data e a hora.';al.className='alert error';return;}
+  if(!svc){al.textContent='Informe o tipo de serviço.';al.className='alert error';return;}
+  c.nextAppt={datetime:new Date(dt).toISOString(),service:svc};
+  save();
+  al.textContent='Horário salvo!';al.className='alert success';
+  renderAdminDetail(c);
+  if(shownClientId===c.id) showLoyaltyCard(c);
+}
+function clearAppt() {
+  const c=state.clients.find(x=>x.id===selectedClientId);
+  if(!c) return;
+  delete c.nextAppt;
+  save();
+  renderAdminDetail(c);
+  if(shownClientId===c.id) showLoyaltyCard(c);
 }
 function renderNailGrid(cid,count,goal) {
   const el=document.getElementById(cid); el.innerHTML='';
@@ -775,6 +836,16 @@ function showLoyaltyCard(c) {
     disp>=state.goal?'🎁 Prêmio disponível!':`Faltam ${state.goal-disp}`;
   renderNailGrid('lc-nails-grid',disp,state.goal);
   document.getElementById('lc-gift-banner').style.display=(c.gifts||0)>0?'block':'none';
+  // Próximo horário
+  const apBanner=document.getElementById('lc-appt-banner');
+  const now=new Date();
+  if(c.nextAppt&&c.nextAppt.datetime&&new Date(c.nextAppt.datetime)>=new Date(now.getFullYear(),now.getMonth(),now.getDate())){
+    document.getElementById('lc-appt-text').textContent=
+      c.nextAppt.service?`${fmtDateTime(c.nextAppt.datetime)} — ${c.nextAppt.service}`:fmtDateTime(c.nextAppt.datetime);
+    apBanner.style.display='block';
+  } else {
+    apBanner.style.display='none';
+  }
   const hist=document.getElementById('lc-history');
   if(!c.services.length){hist.innerHTML='<div style="font-size:0.8rem;color:var(--muted)">Nenhum serviço ainda.</div>';return;}
   hist.innerHTML=[...c.services].reverse().map((s,i)=>{
