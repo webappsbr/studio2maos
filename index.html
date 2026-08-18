@@ -766,7 +766,7 @@ function sendConfirmWhatsApp(clientId) {
   const dataStr=`${pad(d.getDate())}/${pad(d.getMonth()+1)}`;
   const horaStr=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
   const svc=c.nextAppt.service?` de ${c.nextAppt.service}`:'';
-  const msg=`Olá, ${c.name}! Aqui é a Isa, do Studio 2 Mãos ❤✨ Passando para confirmar seu horário${svc} amanhã, dia ${dataStr} às ${horaStr}. Podemos confirmar?`;
+  const msg=`Olá, ${c.name}! Aqui é a Isa, do Studio 2 Mãos ❤ Passando para confirmar seu horário${svc} amanhã, dia ${dataStr} às ${horaStr}. Podemos confirmar?`;
   const url=`https://wa.me/${num}?text=${encodeURIComponent(msg)}`;
   window.open(url,'_blank','noopener');
 }
